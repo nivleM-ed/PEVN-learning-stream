@@ -1,0 +1,196 @@
+PEVN - Stream
+
+PostgreSQL, Express, Vue 
+
+Prerequisite
+- Node Js
+- Express Js
+- Vue Js
+- PostgreSQL
+- Git/Github
+
+Focus on backend
+Idea - create an app where user can save their daily expenses and view statistics of their expenses 
+- show how to create backened APIs
+- work with REST API
+
+1. Install Node Js - https://nodejs.org/en/download/
+- comes with npm
+
+2. Install PostgreSQL
+- https://www.postgresql.org/download/
+- select version();
+
+*Global dependencies*
+- npm install -g sequelize-cli
+- npm install -g nodemon
+
+3. Install Express Js
+- npm install -g express-generator (use to create an express skeleton)
+*Setting up the backend before coding*
+- express --view=pug [name]
+- cd [name]
+- git init
+- npm install
+- npm install --save sequelize 
+- npm install --save pg pg-hstore 
+- npm install passport passport-local bcrypt validator express-session connect-flash validator lodash --save
+
+*Set up the database*
+- change username(postgres), password(password), database(expense_db), dialect(postgres)
+- MIGRATION TEMPLATE (DataTypes - https://sequelize.org/master/manual/model-basics.html#data-types )
+'use strict'
+module.exports = {
+    up: (queryInterface, Sequelize) => {
+        return queryInterface.createTable('table_name', {
+            id: {
+                allowNull: false,
+                primaryKey: true,
+                type: Sequelize.STRING,
+                defaultValue: Sequelize.UUIDV4
+            },
+            createdAt: {
+                allowNull: false,
+                type: Sequelize.DATE
+            },
+            updatedAt: {
+                allowNull: false,
+                type: Sequelize.DATE
+            },
+            data: { 
+                allowNull: false,
+                type: Sequelize.INTEGER
+            },
+        }, {
+            freezeTableName: true
+        });
+    },
+    down: (queryInterface, Sequelize) => {
+        return queryInterface.dropTable('table_name');
+    }
+};
+
+-MODEL TEMPLATE
+'use strict';
+module.exports = (sequelize, DataTypes) => {
+    var table_name = sequelize.define('table_name', {
+        id: {
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
+            allowNull: false,
+            primaryKey: true
+        },
+        data: { 
+            allowNull: false,
+            type: DataTypes.INTEGER
+        },
+    }, {
+        freezeTableName: true
+    });
+
+    return table_name;
+};
+
+- npx sequelize-cli db:migrate
+- npx sequelize-cli db:migrate:undo:all
+- Create session table
+CREATE TABLE "session" (
+  "sid" varchar NOT NULL COLLATE "default",
+	"sess" json NOT NULL,
+	"expire" timestamp(6) NOT NULL
+)
+WITH (OIDS=FALSE);
+ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE;
+
+
+*Set up app.js*
+- Create folder(controller)
+- Add required files into app.js
+let passport = require('passport');
+let session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
+const sessionPool = require('pg').Pool;
+var CONST = require('./const');
+require('./passport_setup')(passport);
+let {run_db} = require('./dbJoin');
+
+- Add session for user access
+const sessionDBaccess = new sessionPool(CONST.dbPool);
+app.use(session({
+  store: new pgSession({
+    pool: sessionDBaccess,
+    tableName: 'session'
+  }),
+  secret:"apassword",
+  saveUninitialized:false,
+  resave:false,
+  cookie:{secure:false, httpOnly:true, path: '/' } //maxAge:15 * 1000 * 60
+}));
+
+- Add passport js
+app.use(passport.initialize());
+app.use(passport.session());
+
+- Add database join
+run_db();
+
+- CORS
+app.use(function(req, res, next) {
+  res.header('Access-Control-Allow-Credentials', true);
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
+  res.header('Access-Control-Allow-Headers', 'X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept, Authorization');
+  if ('OPTIONS' == req.method) {
+       res.sendStatus(200);
+   } else {
+       next();
+   }
+  });
+
+- Remove views engine setup
+- Create expense.js for (controller & routes)
+- Explain routes & controller
+- CONTROLLER REQUIRE (https://sequelize.org/master/manual/model-querying-basics.html )
+const models = require('./models');
+var sequelize = require('sequelize')
+const op = sequelize.Op;
+
+exports.update = function (req, res, next) {
+    return models.expenses.update({
+        expenses: req.body.expObj._expenses
+    }, {
+        where: {
+            id: req.body.expObj._id,
+            user_id: req.user.id
+        }
+    }).then(result => {
+        res.status(200).send(result);
+    }).catch(err => {
+        res.status(500).send(err);
+    })
+}
+
+exports.get = function (req, res, next) {
+    return models.expenses.findOne({
+        include: [{
+            model: models.Users,
+            required: true,
+            as: 'user_expenses',
+            attributes: ['username']
+        }],
+        where: {
+            user_id: req.user.id
+        }
+    }).then(result => {
+        res.status(200).send(result);
+    }).catch(err => {
+        res.status(500).send(err);
+    })
+}
+
+4. Install Vue Js
+- npm install vue -g  //not needed
+- npm install -g @vue/cli
+- vue create frontend-app
+- vue add vuetify
+- npm install vue-router
