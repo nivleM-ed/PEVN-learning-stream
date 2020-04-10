@@ -42,7 +42,7 @@ module.exports = function (passport) {
                 } else if (user.password == null || user.password == undefined) {
                     return done(null, false, {'err':'pwdProblem'})
                 } else if (!validPassword(user, password)) {
-                    return done(nuill, false, {'err': 'wrongPassword'})
+                    return done(null, false, {'err': 'wrongPassword'})
                 }
                 return done(null, user)
             }).catch(err => {
